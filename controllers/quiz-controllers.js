@@ -3,22 +3,40 @@ const Quizresult = require("../Models/Quizresult");
 const Productsscoresecom = require("../Models/Productscorerecom");
 const Product = require("../Models/Product");
 const User = require("../Models/User");
+const { v4: uuidv4 } = require("uuid");
 
 const addQuestion = async (req, res) => {
   console.log(req.body);
-  const { question, option1, option2, option3 } = req.body;
+  const { question, options, tips, firstQuestion, lastQuestion } = req.body;
+
+  // let optionsInitialization = options.map((option) => {
+  //   return { ...option, optionId: uuidv4() };
+  // });
+
+  if (firstQuestion) {
+    let firstQuestionFound = await Quiz.findOne({ firstQuestion: true });
+    console.log(firstQuestionFound, "i am first question");
+    if (firstQuestionFound) {
+      res.status(400).json({
+        success: false,
+        message: "Only one question can be choosed as first",
+      });
+      return;
+    }
+  }
 
   const createdQuestion = new Quiz({
     question,
-    option1,
-    option2,
-    option3,
+    options: options,
+    tips,
+    firstQuestion: firstQuestion ? firstQuestion : false,
+    lastQuestion: lastQuestion,
   });
 
   try {
     createdQuestion.save((err) => {
       if (err) {
-        res.json({
+        res.status(500).json({
           success: false,
           data: err,
           message: "Creating Question failed",
@@ -34,74 +52,146 @@ const addQuestion = async (req, res) => {
       }
     });
   } catch (err) {
-    res.json({
+    res.status(500).send({
+      message: "Question creation failed",
       success: false,
-      data: err,
-      message: "Creating Question failed",
+    });
+  }
+};
+
+const connectQuestions = async (req, res) => {
+  const { questionId, options } = req.body;
+  console.log(questionId, options);
+
+  try {
+    let updatedQuestion = Quiz.updateOne(
+      { _id: questionId },
+
+      {
+        $set: { options },
+      }
+    )
+      .then((response) => {
+        console.log(response);
+        res.status(200).json({ success: true, message: "Question Connected" });
+      })
+      .catch((err) => {
+        console.log(err);
+        res
+          .status(500)
+          .json({ success: false, message: "Question  Updating Error" });
+      });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({
+      success: false,
+      message: "Somthing went wrong while connecting the question",
     });
   }
 };
 
 const editQuestion = async (req, res) => {
-  const { question, option1, option2, option3, _id } = req.body;
+  console.log(req.body);
+  const { question, options, tips, firstQuestion, _id, lastQuestion } =
+    req.body;
 
-  try {
-    let updatedQuestion = Quiz.updateOne(
-      { _id: _id },
+  // let optionsInitialization = options.map((option) => {
+  //   return { ...option, optionId: uuidv4() };
+  // });
 
-      {
-        $set: { question, option1, option2, option3 },
-      }
-    )
-      .then((response) => {
-        console.log(response);
-        res.json({ success: true, message: "Question Updated" });
-      })
-      .catch((err) => {
-        console.log(err);
-        res.json({ success: false, message: "Question  Updating Error" });
+  if (firstQuestion) {
+    let firstQuestionFound = await Quiz.findOne({ firstQuestion: true });
+    console.log(firstQuestionFound, "i am first question");
+    if (firstQuestionFound && firstQuestionFound._id.toString() !== _id) {
+      res.status(400).json({
+        success: false,
+        message: "Only one question can be choosed as first",
       });
-  } catch (err) {
-    console.log(err);
-    res.json({
-      success: false,
-      message: "Error Saving ImagesS",
-    });
+      return;
+    }
   }
+
+  Quiz.updateOne(
+    { _id: _id },
+
+    {
+      $set: { question, options, tips, firstQuestion, _id, lastQuestion },
+    }
+  )
+    .then((response) => {
+      console.log(response);
+      res.status(200).json({ success: true, message: "Question Updated" });
+    })
+    .catch((err) => {
+      console.log(err);
+      res
+        .status(500)
+        .json({ success: false, message: "Question  Updating Error" });
+    });
 };
 
-const deleteQuestion = async (req, res) => {
-  console.log(req.body);
-
-  const { id } = req.body;
-
-  console.log(id);
-
+const deleteQuiz = async (req, res) => {
   try {
-    let quiz = await Quiz.deleteOne({ _id: id });
-    res.json({ success: true, message: "Question deleted" });
+    let quiz = await Quiz.remove({});
+    res.status(200).json({ success: true, message: "Quiz deleted" });
+    return;
   } catch (err) {
     console.log(err);
-    res.json({ success: false, message: "Deleteing Failed" });
+    res.status(500).json({ success: false, message: "Deleteing Quiz Failed" });
     return;
   }
 };
 
 const getQuestions = async (req, res) => {
-  const questions = await Quiz.find({});
-  if (questions) {
-    res.json({
+  try {
+    const questions = await Quiz.find({});
+    res.status(200).json({
       success: true,
       questions,
       message: "Questions Found",
     });
     return;
-  } else {
-    res.json({
+  } catch (err) {
+    res.status(500).json({
       success: false,
-      message: "Questions not Found",
+      message: "Something went wrong",
     });
     return;
+  }
+};
+
+const getFirstQuestion = async (req, res) => {
+  try {
+    let question = await Quiz.findOne({ firstQuestion: true });
+    res.status(200).json({
+      message: "First question found",
+      success: true,
+      question: question,
+    });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({
+      message: "Something went wrong",
+      success: false,
+    });
+  }
+};
+
+const getNextQuestion = async (req, res) => {
+  const { questionId } = req.body;
+  try {
+    let question = await Quiz.findOne({ _id: questionId });
+    res.status(200).json({
+      message: "Next Question",
+      success: true,
+      question: question,
+    });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({
+      message: "Something went wrong",
+      success: false,
+    });
   }
 };
 
@@ -117,7 +207,7 @@ const saveQuizResult = async (req, res) => {
     try {
       createdQuizResult.save(async (err, data) => {
         if (err) {
-          res.json({
+          res.status(500).json({
             success: false,
             data: err,
             message: "Result saving failed",
@@ -136,7 +226,7 @@ const saveQuizResult = async (req, res) => {
                 //   });
                 console.log({ message: "Result Saved" });
                 let productsIds;
-                if (result === 1) {
+                if (result < 4) {
                   productsIds = await Productsscoresecom.findOne({
                     name: "1",
                   });
@@ -153,13 +243,14 @@ const saveQuizResult = async (req, res) => {
                     return;
                   } catch (err) {
                     console.log(err);
-                    res.json({
+                    res.status(500).json({
                       success: false,
                       message: "Products fecthing Failed",
                       data: err,
                     });
+                    return;
                   }
-                } else if (result === 2) {
+                } else if (result >= 4 && result < 8) {
                   productsIds = await Productsscoresecom.findOne({
                     name: "2",
                   });
@@ -176,13 +267,14 @@ const saveQuizResult = async (req, res) => {
                     return;
                   } catch (err) {
                     console.log(err);
-                    res.json({
+                    res.status(500).json({
                       success: false,
                       message: "Products fecthing Failed",
                       data: err,
                     });
+                    return;
                   }
-                } else if (result === 3) {
+                } else if (result > 8 && result <= 10) {
                   productsIds = await Productsscoresecom.findOne({
                     name: "3",
                   });
@@ -198,11 +290,12 @@ const saveQuizResult = async (req, res) => {
                     return;
                   } catch (err) {
                     console.log(err);
-                    res.json({
+                    res.status(500).json({
                       success: false,
                       message: "Products fecthing Failed",
                       data: err,
                     });
+                    return;
                   }
                 }
               } else {
@@ -225,9 +318,9 @@ const saveQuizResult = async (req, res) => {
       return;
     }
   } else {
-    res.json({
+    res.status(400).json({
       success: false,
-      message: "All fields are required",
+      message: "Some fields are missing",
     });
   }
 };
@@ -252,6 +345,9 @@ module.exports = {
   getQuestions,
   saveQuizResult,
   editQuestion,
-  deleteQuestion,
+  deleteQuiz,
   getQuizResult,
+  connectQuestions,
+  getNextQuestion,
+  getFirstQuestion,
 };

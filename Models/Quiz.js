@@ -4,10 +4,11 @@ const mongoose = require("mongoose");
 const Schema = mongoose.Schema;
 
 const quizSchema = new Schema({
-  question: { type: String, required: true },
-  option1: { type: String, required: true },
-  option2: { type: String, required: true },
-  option3: { type: String, required: true },
+  question: { type: String },
+  options: { type: Array },
+  tips: { type: String },
+  firstQuestion: { type: Boolean },
+  lastQuestion: { type: Boolean },
 });
 
 // userSchema.plugin(uniqueValidator);
